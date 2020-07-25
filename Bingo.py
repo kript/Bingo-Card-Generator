@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
+Originaly Taken from https://homework.nwsnet.de/releases/3822/
 (Bullshit) Bingo Card Generator
 ===============================
 
@@ -30,8 +31,6 @@ be installed separately.
 Changelog
 ---------
 
-- Read words file with UTF-8 encoding to support non-ASCII characters.
-
 - Switched template engine from Genshi to Jinja 2 to get more control over
   whitespace handling.
 
@@ -46,6 +45,7 @@ Changelog
 .. _optparse:       http://docs.python.org/library/optparse.html
 
 :Copyright: 2007-2012 `Jochen Kupperschmidt <http://homework.nwsnet.de/>`_
+: badly hacked around by John Constable 2020
 :Date: 12-Jun-2012 (previous release: 09-Nov-2007)
 :License: MIT
 """
@@ -54,83 +54,17 @@ from __future__ import with_statement
 import argparse
 import codecs
 from collections import namedtuple
-from itertools import chain, islice, izip_longest, repeat
+from itertools import chain, islice, zip_longest, repeat
 from random import randrange, sample
 import sys
 
-from jinja2 import Environment
+import jinja2
 
 
 Field = namedtuple('Field', ['type', 'value'])
 
 FIELD_EMPTY = Field('empty', None)
 FIELD_BONUS = Field('bonus', None)
-
-TEMPLATE = """\
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <style>
-      @media print {
-        html,
-        body {
-          margin: 0;
-        }
-      }
-
-      h1 {
-        font-size: 6mm;
-      }
-
-      table {
-        border-color: #666666;
-        border-spacing: 0;
-        border-style: solid;
-        border-width: 0 0.25mm 0.25mm 0;
-        margin-bottom: 1cm;
-      }
-      td {
-        border-color: #666666;
-        border-style: solid;
-        border-width: 0.25mm 0 0 0.25mm;
-        font-size: 4mm;
-        height: 2cm;
-        text-align: center;
-        width: 3cm;
-      }
-      td strong {
-        font-size: 120%;
-        text-transform: uppercase;
-      }
-    </style>
-    <title>Bullshit Bingo</title>
-  </head>
-  <body>
-    {%- for table in tables %}
-
-    <h1>Bullshit Bingo</h1>
-    <table cellspacing="0">
-      {%- for row in table %}
-      <tr>
-        {%- for field in row %}
-        <td>
-          {%- if field.type == 'normal' -%}
-            {{ field.value }}
-          {%- elif field.type == 'bonus' -%}
-            <strong>Bingo!</strong>
-          {%- elif field.type == 'empty' -%}
-            -
-          {%- endif -%}
-        </td>
-        {%- endfor %}
-      </tr>
-      {%- endfor %}
-    </table>
-    {%- endfor %}
-
-  </body>
-</html>"""
 
 def parse_args():
     """Parse command line arguments."""
@@ -164,7 +98,8 @@ def load_words(filename):
 
     Every line is to be considered as one word.
     """
-    with codecs.open(filename, 'rb', 'utf-8') as f:
+    #with codecs.open(filename, 'rb') as f:
+    with codecs.open(filename, 'r') as f:
         for line in f:
             # Only yield non-empty, non-whitespace lines.
             line = line.strip()
@@ -187,7 +122,7 @@ def build_table(values, size, include_bonus_field=False):
         fields[randrange(0, field_total)] = FIELD_BONUS
 
     # Group into rows.
-    return izip_longest(*[iter(fields)] * size)
+    return zip_longest(*[iter(fields)] * size)
 
 def collect_random_sublist(values, n):
     """Return unique, random elements from the values.
@@ -213,8 +148,12 @@ def take(iterable, n):
 
 def render_html(tables):
     """Assemble an HTML page with cards from the word tables."""
-    env = Environment(autoescape=True)
-    template = env.from_string(TEMPLATE)
+    #env = Environment(autoescape=True)
+    #template = env.from_string(TEMPLATE)
+    templateLoader = jinja2.FileSystemLoader(searchpath="./")
+    templateEnv = jinja2.Environment(loader=templateLoader, autoescape=True)
+    TEMPLATE_FILE = "template.html"
+    template = templateEnv.get_template(TEMPLATE_FILE)
     return template.render(tables=tables)
 
 if __name__ == '__main__':
@@ -225,9 +164,12 @@ if __name__ == '__main__':
 
     # Create tables of words.
     tables = [list(build_table(words, args.card_size, args.include_bonus_field))
-        for _ in xrange(args.num_cards)]
+        for _ in range(args.num_cards)]
 
     # Write HTML output to stdout.  To create a file, redirect the data by
     # appending something like ``> cards.html`` at the command line.
-    html = render_html(tables).encode('utf-8')
-    sys.stdout.write(html)
+    #html = render_html(tables).encode('utf-8')
+    html = render_html(tables).encode()
+    #print(html)
+    with open("Bingo.html", "wb") as fh:
+      fh.write(html)
